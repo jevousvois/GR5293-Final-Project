@@ -1,0 +1,508 @@
+---
+title: "5293 Final Project"
+author: "Xiaoqian Xue(xx2308), Feng Qiu(fq2150)"
+date: "4/30/2019"
+output:
+  html_document:
+    toc: true
+---
+
+# I. Introduction
+
+### Github Link
+
+https://github.com/jevousvois/GR5293-Final-Project
+
+From 1900 to today, from the first motion pictures to today's three-dimensional stereoscopic films, from a novelty show to a well-established large-scale entertainment industry, the films have always played an important role on entertaining, reflecting and influencing the society. "Genre" was used to organize films and by producing a film in a certain genre, filmmakers can appeal to specific audiences. Thus, we believe that to better understand how the films has been influenced the society, we can use the online movie ratings, the budgets and gross of films to answer the following questions: 
+
+1. What kind of genre is the most appealing overtime? 
+2. Are there any changes in the most popular genre overtime? If there is, what is the changing pattern?
+3. Is there any interaction effect between the films' running time and the popularity?
+4. Do people have difference taste for a specific genre?
+5. What kinds of genre get the highest rating throughout time? 
+6. Are there any changes in the genre of the highest rating's films overtime? If there is, what is the changing pattern?
+7. What kind of movies are more likely to be invested with higher budget? 
+8. What kind of movies are more likely to have higher returns?
+
+The last two questions are also significant to reflect people's preference in specific genre. Since if the budget and the gross is high, it means that the producer and the audience believe that this kind of genre is worth to spend such amount of money and thus it can reflect the society's taste on specific genre. 
+
+
+# II. Dataset
+
+In this project, we are going to use two datasets. One dataset is from IMDb websites, which is an online database for movies, television and video games. The data is coming from IMDb registered users who can directly cast a vote from 1 to 10 on every released title (the movie having been shown publicly at least once) in the database. Then, IMDb will publish unbiased weighted vote averages on its interface(https://www.imdb.com/interfaces/). The other dataset is from the numbers websites, (https://www.the-numbers.com/movie/budgets/all), which is an online database collecting the movies budget information. The movies in those two datasets may not correspond to each other by the specific movie. But in our project, there is no need for the correspondence, and we are just going to use the independent variable in each dataset for analyzing.
+
+Certainly, other than IMDb, there are many other rating websites that come up with their own movie ratings, such as Fandago, Rotten Tomatoes. Even though Rotten Tomatoes is the most widely used and largest movie reviewing sites, the data is hard to find. However, we can easily find the dataset from IMDb interface. Thus, in this project, we chose to use IMDb data. And we hope that some day, we can use more sophisticated approach to obtain moving ratings from other websites.
+ 
+We have chosen the following variables and incorporated in our plot data:
+
+Data from IMDb:
+1. primaryTitle and originalTitle: the title used by the filmmakers on promotional materials at the point of release
+2. originalTitle: original title in the original language
+3. startYear: the release year of the films.
+4. runtimeMinutes: primary runtime of the films, in minutes
+5. averageRating: the films' IMDb ratings
+6. numVotes: number of votes (in this project, we will consider it as the popularity)
+7. genre1, genre2, genre3: the films' genres
+8. titleType: the films' types, including movie, short, tvseries, tvepisode, video, etc.
+
+Data from "the numbers":
+9. Release Data
+10. Production Budget
+11. Domestic Gross
+12. Genres
+
+There can be some problems with our dataset. The fact that those ratings are based on the votes of the website's users, with a little bit of mathematical re-jigging mechanism from IMDb may not be completely reflect the social preference but this can be the best we could do at this time. The genre classification might be slightly different between each website and each individual. For example, we have found that even though IMDb classified "A Trip to the moon" as Action, Adventure and Comedy, Wikipedia classified as Science Fiction. To solve this problem, we will stay with the genre classification from IMDb with the first genre as the primary. Also, the dataset does not only include film/movie, but also TV series, video, etc, and some TV series publish continuously throughout several years. To solve this problem, we decide to include those other film types besides movies as well, as they are also very significant in reflecting social preference for media and we will treat them equally in our analysis. But we will only consider the first release year for those tvseries or tvepisode since we believe that the first release is the most important and the most reflective. 
+
+Also, rating and popularity for each movie may not completely reflect people's preference for genre. Since for a specific genre, the movie's quality vary a lot. However, from our perspective, there certainly exists certain types of movie that we may prefer to look at and also types of movie we avoid. Thus, in this project, we are trying to determine the popularity and rating in several kinds of variables, analyzing and displaying the trend in different format and then combine them together to reach a conclusion so that the result can be more reliable. 
+
+# III. Description of data import / cleaning / transformation
+
+We first downloaded two files containing the data we needed "title.ratings.tsv.gz" and "title.basics.tsv.gz" from https://datasets.imdbws.com. There are 9916766 ratings and 9916896 data with the films' information. Both files are too big to open in R. Thus, we chose to use Excel to combine those two datasets. For the simplicity of our analysis, we chose to analyze films with number of votes greater than 25000 and after filtering we got 5544 data in total. The "tcont" numbers are the same between those two files and thus we used the "VLOOKUP" function in Excel to combine the ratings and films' information by their "tcont" numbers.
+
+Then we used R to separate the "genre" column by three different columns "genre1", "genre2", "genre3" so that each genre can occupy one cell (Some films do not have genre2 and genre3). Then we wrote it into csv file for further analysis.
+
+Second, we downloaded the dataset from https://www.the-numbers.com/movie/budgets/all and used three variables in our analysis: "Release Data", "Production Budget", "Domestic Gross" and we wrote it into csv file with column names "year",  "budget" and "gross". 
+
+```{r,echo=FALSE}
+#IMDBData <- read_excel("IMDBData.xlsx")
+#library(tidyr)
+#IMDBData <- separate(data = IMDBData, col = genres, into = c("genre1", "genre2", "genre3"), sep = ",")
+#IMDBData <- IMDBData[-c(14)]
+#write.csv(IMDBData, file="IMDBData.csv")
+#GrossBudget <- read_excel("Gross-Budget.xlsx")
+#colnames(GrossBudget) <- c("year", "gross", "budget")
+#write.csv(GrossBudget, file = "GrossBudget.csv")
+```
+
+# IV. Analysis of missing values
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE}
+setwd("C:/Users/AshChiVoo/Documents/RStudio/GR5293/Final Project")
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(reshape)
+library(extracat)
+library(grid)
+library(gridExtra)
+library(plotly)
+library(gapminder)
+library(ggridges)
+```
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+dataset <- fread("IMDBData.csv")
+dataset$endYear <- replace(dataset$endYear,dataset$endYear=="\\N",NA)
+visna(dataset,sort = "r")
+```
+
+To start with, there are some missing value in the first dataset `IMDBData`.  Most parts miss values in variable `endYear`, `genre2` and `genre3`, while some parts miss values in `runtimeMinute`. The reason is that this dataset contains data including TV series and Videogames. Some TV series may run for a lot of years and thus the `endYear` means the last episode of final season, but movies or other types only show up for one time and thus do not have `endYear`.
+
+To avoid the problems of missing value, the three variables related to genres will be combined into the same column described as `Genres`. We will not use the variable `endYear` in our analysis and will only consider the `startYear` . 
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Gross and Budget info
+finset <- fread("GrossBudget.csv") %>% 
+  select(year:genres6) %>%
+  gather( key= "varibale",value = "Genre","genres1","genres2","genres3","genres4","genres5","genres6") %>%
+  select(c(gross,budget,year,Genre))
+finset$Genre <- replace(finset$Genre,finset$Genre=="",NA)
+visna(finset,sort = "r")
+
+findata <- finset %>% filter(is.na(gross)==FALSE) %>%
+  filter(is.na(budget)==FALSE) %>%
+  filter(is.na(Genre)==FALSE) %>%
+  filter(is.na(year)==FALSE)
+
+```
+
+The second dataset `GrossBudget` also has missing value problems. However, even if all terms in which the missing value appears, there are still over 10,000 movies that can be used. 
+
+# V. Results
+
+**1.What kind of genre is the most appealing overtime?**
+**2.Are there any changes in the most popular genre overtime? If there is, what is the changing pattern?**
+
+To answer those questions, we will use two independent variables. First, since the dataset contains the top 5500 movies, we would like to count the total number of each genre and find which genre has the largest number among those popular movies. Second, since the ratings are calculated by votes and there are a count of votes for each movie, people votes because they have seen the movie. So we are going to sum the total number of votes for different movies in each genre and see how the popularity changes within in each genre. Since if the variation of popularity in a specific genre is large, we cannot conclude that this kind of genre is popular at that time.
+
+The total number for different genres of popular movies from 1902 to 2019 is represented below. This plot roughly indicates people's tastes on movies types throughout those 117 years.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Number of genres in dataset
+data <- dataset %>%
+  select(averageRating:genre3) %>%
+  melt(.,id=colnames(.)[-(8:10)]) %>%
+  select(c(averageRating:runtimeMinutes,value))
+
+colnames(data)[8] <- "Genre"
+data$Genre <- replace(data$Genre, data$Genre=="",NA)
+
+movie.data <- data %>% filter(titleType=="movie") %>%
+  filter(is.na(Genre)==FALSE)
+  
+Genre.sum <- movie.data %>% group_by(Genre) %>% summarise(n=n()) %>% mutate(genre.ord = reorder(Genre,-n))
+
+ggplot(data=Genre.sum, aes(genre.ord,n))+
+  geom_bar(stat="identity",fill="#3784ef")+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold")) +
+  labs(title="Popular Movie Genres from 1902 to 2019")+
+  xlab("Genre")+ 
+  ylab("Number")
+```
+
+From 1902 to 2019, approximately one half of the popular movies can be classified into Drama. Comedy, Action, Crime, Thriller were also very popular. This corresponds to what we have expected since those genres are also very popular today.  Among those top 5000 popular movies, genres such as `Film-Noir`, `Western`, `Documentary` are less popular among the audience.  Since the number of those genres are too small to consider it into the analysis, we will integrate them as genre type `Other` later. To be specific, the criteria that we use to classify a specific genre as type `Other` is less or equal to 5% of the overall number of genres in `IMDBData` dataset.
+
+After looking into the overall taste for the genre of the movies, we would like to see how the taste for genres changes throughout over 100 years.  Thus, we plot the number of a specific genre in every 5 years: 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+### Number in every 5-year
+movie.data <- movie.data %>% mutate(Years = floor(startYear/5)*5)
+N <- unique(movie.data$primaryTitle) %>% length
+Other <- Genre.sum$Genre[Genre.sum$n < N*0.05]
+
+movie.data$Genre <- replace(movie.data$Genre, movie.data$Genre %in% Other, "Other")
+findata$Genre <- replace(findata$Genre, findata$Genre %in% Other, "Other")
+
+numin5year <- movie.data %>%
+  group_by(Genre,Years) %>%
+  summarise(n=n())
+
+ggplot(data=numin5year, aes(Years,n,group=Genre))+
+  geom_line(aes(color=Genre))+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Popular Movie Genres in Every 5 Years")+
+  xlab("Years")+
+  ylab("Number")
+```
+
+We observed that the overall trend shows an increasing pattern before 2010 and this is much clearer after 1980. This can be cause by two possible reasons: one is that there are more and more movies being produced since technology today is much better, the other is that people who used the internet to vote are more likely to be young than elder and young people are more likely to see movies in recent years compared to the old years. There is a peak at year 2010 and decreasing since then. This might be due to the short time for those data to be collected completely. Compatible with the last plot of overall genre, drama movies show a dominate position and the domination becomes much clearer after year 1990. 
+
+However, we have noticed some interesting fact by plotting the number of popular movie genres in each year:
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Number in Each Year
+numinyear <- movie.data %>%
+ group_by(Genre,startYear) %>%
+ summarise(n=n())
+
+ggplot(data=numinyear, aes(startYear,n,group=Genre))+
+  geom_line(aes(color=Genre))+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Movie Genres in Each Year")+
+  xlab("Years")+
+  ylab("Number")
+```
+
+Besides the overall increasing trend, we can see some zigzag patterns and fluctuations the graph. This may indicate that if movies in specific genre have been popular in one year, then movies in that genre become less popular the next year. In other words, the increasing trend is not continuous. Vice versa, if movies in specific genre perfom less popular, movies in next year tend to catch up. `Drama` and `action` show a more obvious pattern in this plot.In some sense,such phenomenon reflects the taste on movie of people is kind of intermittent. The preference of a specific genre cannot last for a long time. Such trend is with respect to the whole movie market, not to the individual. But we may raise a question: are this all due to the genre or simply because of the movie itself? Thus, we may want to see how movies in each genre perform throughout time. We believed that the number of votes for each film can be an objective criterion indicating the number of people who have watched a certain movie. Thus, we may assume that the motivation for people to watch a movie may due to the popularity. (We are not talking about whether the film is good or not here)
+
+First, we would like to see how the films' distribution are to see whether people's taste in specific genre is significantly different or not. Thus, we plot the ridgeline plots:
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Number of votes in different Years
+voteinyear <- movie.data %>%
+  group_by(Genre,startYear) %>%
+  summarise(n=median(numVotes))
+
+order.median <- voteinyear %>%
+  arrange(n)%>%
+  select(Genre)%>%
+  pull()
+
+ggplot(data=voteinyear,aes(x= n, y=factor(Genre,order=TRUE,levels=unique(order.median)),fill=Genre))+
+  geom_density_ridges(alpha=0.5)+
+  theme_ridges()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Vote Number in Eveary 5-Year")+
+  xlim(0,600000)+
+  ylab("")+
+  xlab("Votes")
+```
+
+The ridgeline plots of votes for all the genres of movies show the distribution of the number of votes in each genre. We can find out that most genres's distribution is unimodal and have right skewness, which means that the mean is greater than the median. This indicates that most movies actually have the similar performance, but there are also some outstanding movies which can acquire more attention from audience. There are also some bimodal distribution showing on the graph, meaning that there are two peaks (two maximum) on its distribution. `Sci-Fi`, `Family` and `Adventure` which means that there are two votes number most movies are getting. Thus, we may assume that those three genres cannot simply be conclude their popularity simply by looking at the total number of votes.
+
+The highest voting of each specific genre can be a good representation for the popularity if we want to see the trends of the popularity of a specific genre throughout time. First, we find the highest voting number of movies in each year and sum them by genres to see what types of genre are the most likely to get the highest voting number in each year.
+```{r,echo=FALSE}
+voting <- movie.data %>% 
+  group_by(startYear) %>% 
+  summarise(n=max(numVotes)) %>%
+  data.frame()
+
+voting.count <- c()
+for (i in 1:nrow(voting)){
+  movie <- movie.data %>% filter(startYear==voting[i,1]) %>%
+    filter(numVotes==voting[i,2])
+  genre <- movie$Genre
+  voting.count <- c(voting.count,genre)
+}
+voting.count <- voting.count %>% 
+  tibble(Genre=.) %>%
+  group_by(Genre) %>%
+  summarise(n=n()) %>%
+  mutate(genre.ord = reorder(Genre,-n))
+
+ggplot(data = voting.count,aes(genre.ord,n))+
+  geom_bar(stat="identity",fill="#3784ef")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Count of Highest Voting Number for Each Genre Throughout Years")+
+  xlab("Genre")+ 
+  ylab("Times")
+```
+
+The bar chart above shows the count of the highest voting number in each years with respect to genres. From 1902 to 2019, `drama` movies shows a clear advantage in getting the highest voting numbers, followed by `adventure` and `action` movies, while `animation` is least likely to getting the highest voting numbers. Since all those genres do not have a very high variation from our previous ridgeline plots' result, we may consider that the highest voting number of those genres can correctly reflect their popularity.
+
+Then, to see how the numbers of highest voting in each year with respect to genre changed throughout time, we will plot it on a 5-year time base:
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+## Highest voting number in Years
+highvoteinyear <- movie.data %>%
+  group_by(Genre,Years) %>%
+  summarise(n=max(numVotes))
+
+ggplot(data=highvoteinyear,aes(Years,n,group=Genre))+
+  geom_point(aes(color=Genre))+
+  geom_smooth(se=FALSE,aes(color=Genre))+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Count of Highest Vote Number in Every 5-Year")+
+  xlab("Years")+
+  ylab("Votes")
+```
+
+Clearly, there is an increasing pattern before year 2000 and then slightly decreasing after that. The increasing pattern can be easily understood because of the popularity of the internet and the prevalence of cinemas, so that access to movies and rate the movies online became much easier than before. Thus, the votting numbers get larger. The pattern decreased after year 2000 might because there is not enough time for people to rate movies after year 2000.  
+
+The green line represents `drama` and the red line represents `action` which surpass other lines throughout time in the graph. This corresponds with our previous bar chart's result. On the rightmost side, we can find out that the orange line, `adventure`, the red line, `action`, the pink line `sci-fi` surpass the all-the-time dominated green line `drama`. This may suggest that  nowadays, more and more genres are getting people's attention and the movie industry may be expanded to focus on more genres. 
+
+Now, we may have an answer to our first and second questions. `Drama` definitely is the most appealing movie throughout time. But other genres such as `Adventure`, `Action` and `Animation` are catching up in getting people's attention. 
+
+**3. Is there any interaction effect between the films' running time and the popularity?**
+
+To answer this question, we will plot the movie length throughout years colored by genres:
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Movie time in Each year
+timeinyear <- movie.data %>%
+  group_by(Genre,startYear) %>%
+  summarise(n=median(runtimeMinutes))
+
+ggplot(data=timeinyear,aes(startYear,n))+
+  geom_point(aes(color=Genre),alpha=0.5)+
+  geom_smooth(colour="blue")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Movie Length in Each Year")+
+  xlab("Years")+
+  ylab("Time in Minutes")
+```
+
+From the plot, we can see that most points gather around time 80 minutes to 120 minutes. There are some outliers on the graph: a pink-purple point on the left-upper side, which is `Romance` having length around 230 minutes in year 1938. Also, some green points tend to scatter on the upper graph, which are genre `biography`. This corresponds to what we expect about biography which usually has longer time. From our previous bar chart `Count of Highest Voting Number for Each Genre Throughout Years`, we found out that `biography` has the second lowest probability to get a higher voting number. It can also be shown that throughout the years, `biography` is also unlikely to get people's attention. The most popular genre from our previous exploration, `drama`, represented by the greenish color on the plots, do not show up clearly which indicates that the length of it is just around the mean (between 80 minutes to 120 minutes). We may not conclude that there is a exact negative relationship between movies' running time and their popularity since most of the movies have approximately the same length. However, what we can conclude from this plot is part of reason of the unpopularity of `biography`.If the `biography` can get shorter and efficiency in length and more interesting in its presentation, more people might be willing to spend time to watch it. 
+
+**4. Do people have difference taste for a specific genre?**
+
+Besides the popularity of each genre, rating can better reflect people's taste on a scale. To answer this fourth question, we make two rank plots:
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Rating
+## Max Min and Median Rating
+Rating <- movie.data %>% 
+  group_by(Genre) %>% 
+  summarise(Max=max(averageRating),Min=min(averageRating),Median=median(averageRating)) %>% 
+  gather(key="Type",value="Rating","Max","Min","Median")
+
+order.max <- Rating %>%
+  filter(Type=="Max")%>%
+  arrange(Rating)%>%
+  select(Genre)%>%
+  pull()
+
+order.min <- Rating %>%
+  filter(Type=="Min")%>%
+  arrange(Rating)%>%
+  select(Genre)%>%
+  pull()
+
+order.median <- Rating %>%
+  filter(Type=="Median")%>%
+  arrange(Rating)%>%
+  select(Genre)%>%
+  pull()
+
+G1 <- ggplot(data=Rating, aes(Rating,fct_relevel(Genre,order=order.max),color=Type))+
+  geom_point()+
+  theme_minimal()+
+  ggtitle("Highest Rating Rank")+
+  ylab("")+
+  theme(legend.position = "none",
+        plot.title = element_text(size = 17.5, face = "bold"))
+
+G2 <- ggplot(data=Rating, aes(Rating,fct_relevel(Genre,order=order.min),color=Type))+
+  geom_point()+
+  theme_minimal()+
+  ggtitle("Lowest Rating Rank")+
+  theme(plot.title = element_text(size = 17.5, face = "bold"))+
+  ylab("") 
+  
+
+G3 <- ggplot(data=Rating, aes(Rating,fct_relevel(Genre,order=order.median),color=Type))+
+  geom_point()+
+  ggtitle("Median Rating Rank")+
+  theme(plot.title = element_text(size = 17.5, face = "bold"))+
+  ylab("")
+
+grid.arrange(G1,G2,ncol=2)
+#ggplot(data=avg.rating, aes(genre.ord,n))+
+  #geom_bar(stat="identity")+
+  #theme(axis.text.x = element_text(angle=45,hjust=1))+
+  #labs(title="Average Rating for All Movie Genres")+
+  #xlab("Genre")+ 
+  #ylab("Rating")
+```
+
+The graph on the left sided ranks by the highest rating of each genre. The graph on the right sided ranks by the lowest rating of each genre. We can see the order from the two axis and the orders are totally different. Drama, which is the most popular type from our previous results, has the highest rating, while the range of the rating is also very high as it ranks the sixth lowest rating from the right graph. Comedy is the type of genre which has the highest variation. It has the second highest rating but also has the lowest rating among top popular movies. Animation is the type of genre which has the lowest variation. Its highest rating ranks the second lowest while its lowest rating ranks the highest. For rating with higher variation, for example, drama, comedy and crime, we may assume that people's taste are more likely to be subjective. For rating with lower variation, for example, animation, thriller, family, we may believe that people have similar taste.
+
+**5. What kinds of genre get the highest rating throughout time?**
+
+To answer this question, we obtain the highest rating in each year with its genre. And we count how many times each genre gets the highest rating in each year. Then we plot a bar chart:
+
+```{r,rval=FALSE,message=FALSE,warning=FALSE,echo=FALSE}
+highest <- movie.data %>% 
+  group_by(startYear) %>% 
+  summarise(n=max(averageRating)) %>%
+  data.frame()
+
+genre.count <- c()
+for (i in 1:nrow(highest)){
+  movie <- movie.data %>% filter(startYear==highest[i,1]) %>%
+    filter(averageRating==highest[i,2])
+  genre <- movie$Genre
+  genre.count <- c(genre.count,genre)
+}
+genre.count <- genre.count %>% 
+  tibble(Genre=.) %>%
+  group_by(Genre) %>%
+  summarise(n=n()) %>%
+  mutate(genre.ord = reorder(Genre,-n))
+
+ggplot(data = genre.count,aes(genre.ord,n))+
+  geom_bar(stat="identity",fill="#3784ef")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Times of Getting a Highest Rating for Each Genre")+
+  xlab("Genre")+ 
+  ylab("Times")
+```
+
+We found out that `drama` had approximately 55 times getting the highest rating throughout 117 years, which is almost half of the total years. The second largest is `other` genre which includes `Film-Noir`, `Western`, `Documentary`. The times of getting a high rating score of genre `crime`, `adventure`, `comedy`, `action`, `thriller`, are almost the same. The times of getting a highest rating score for `animation` is the smallest (approximately 2 times). Thus, `drama` is not only the most popular genre but also the one getting the highest rating most times. 
+
+**6. Are there any changes in the genre of the highest rating's films overtime? If there is, what is the changing pattern?**
+
+To answer this question, we plot a line chart of the highest rating movies in each year with respect to genres. For a clearer representation, we will plot it each highest rating movies with its rating in every 5 year: 
+
+```{r,rval=FALSE,message=FALSE,warning=FALSE,echo=FALSE}
+## Highest rating in different Years
+highratinginyears <- movie.data %>%
+  group_by(Genre,Years) %>%
+  summarise(n=max(averageRating))
+
+ggplot(data=highratinginyears,aes(as.numeric(Years),n,group=Genre))+
+  geom_point(aes(color=Genre))+
+  geom_smooth(aes(color=Genre),se=FALSE)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Highest Movie Rating in Every 5 Year")+
+  xlab("Years")+
+  ylab("Highest Rating")
+```
+
+From this plot, we can see a clear green line surpass the other lines throughout the timeline. That line represents the highest movie rating of `drama` in every 5 year, which indicates that `drama` seems to be people's all the time favorite movie genre. However, since 2010, `action` and `other` surpassed `drama`. We have found that that purple point,`other`, gets a 9.3 rating score in 2016 is movie `The Mountain II`, which is a `war` movie. This might be a rare case that the high rate is not due to the type of genre but by the specific movie. The most zigzag line, looking like a roller coaster on the bottom is genre `animation`. This corresponds to what we see from two ranks plot that `animation` also has a high variability. 
+
+The highest rating of each year may not completely reflect the quality of movie in each genre. Thus, we would like to see how the median movie rating displays throughout every 5 year: 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+## Rating in different Years
+ratinginyears <- movie.data %>% 
+  group_by(Genre,Years) %>% 
+  summarise(n = median(averageRating))
+
+ggplot(data=ratinginyears,aes(as.numeric(Years),n,group=Genre))+
+  geom_point(aes(color=Genre))+
+  geom_smooth(aes(color=Genre),se=FALSE)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45,hjust=1),
+        plot.title = element_text(size = 17.5, face = "bold"))+
+  labs(title="Median Movie Rating in Every 5-Year")+
+  xlab("Years")+
+  ylab("Median Rating")
+```
+
+The graph has shown an decreasing pattern which means that for almost all the genres, except biography and animation, the median rating number of genre has been decreased. This could be caused by three possible reasons. One is due to the smaller sample size in early year so that the median ratings are higher. The second is due to people standard in evaluating recent movies getting higher because people have seen more movies than before. Third, this trend may reflect that even though today' movies' visual effects have been better, the story itself gets worse.
+
+We have noticed that `biography` and `animation` do not show an exact decreasing pattern. `Biography` reached a peak around year 1970. And the median rating of biograph still continuously ranks a pretty high position after that. However, from our previous popularity analysis, we found out that biography is unpopular.This may indicate two possible phenomenan: One is that the number of votes is too small to have a high variability in rating a specific movie. Second is that the movie itself is pretty good but not lots of people have watched it because of the long running time.
+
+`Animation` median rating had been pretty low compared to other genres before year 1970, but after 1970, the median rating increased dramatically and reached its peak around 1985. After that, the median movie rating had been still positioned at a high place. Such phenomenon can be caused by the development of animation technology such as CG and 3D. The picture of early animation could be poor and the character might be quite stiff but recent years, characters in animation is much more vivid.
+
+#VI. Interactive component
+
+**7. What kind of movies are more likely to be invested with higher budget?**
+
+**8. What kind of movies are more likely to have higher returns?**
+
+To answer this question, we are going to use the mean value of budget, gross and return rate to assess the popularity of a movie genre and show the change pattern by a interactive graph.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,include=FALSE}
+#findata$Genre <- replace(findata$Genre,findata$Genre=="Short","Other")
+
+grossbudget <- findata %>%
+  mutate(budget = as.numeric(budget)/10^6, gross = as.numeric(gross)/10^6) %>%
+  mutate(return = gross/budget) %>%
+  filter(budget>=1,gross>=1,return>0.1) %>%
+  filter(return<100) %>%
+  group_by(Genre,year) %>%
+  summarise(Gross = sum(gross), Budget = sum(budget),Return = sum(gross)/sum(budget))
+
+genre.num <- grossbudget %>% 
+  group_by(year,Genre) %>%
+  summarise(n=n())
+
+ggplot(data=genre.num,aes(year,n)) + 
+  geom_bar(stat="identity",fill="#3784ef")+
+  theme_minimal()+
+  theme(plot.title = element_text(size = 17.5, face = "bold"))+
+  ggtitle("Popular Movie Type in Years")+
+  xlab("Years")+
+  ylab("Number")
+```
+
+To give a more fair presentation, we are going to use the data form 1994 to 2016. Since within these years, the number of popular movie genres are the same.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+Return <- grossbudget$gross - grossbudget$budget
+grossbudget.1994a <- grossbudget %>% filter(year >= 1994)
+colnames(grossbudget.1994a)[2] <- "Year"
+G.a <- ggplot(data=grossbudget.1994a,aes(Budget,Gross,color=Genre))+
+  theme_minimal()+
+  theme(plot.title = element_text(size = 17.5, face = "bold"))+
+  geom_point(aes(size=Return, frame=Year,ids=Genre))+
+  xlab("Budet (Million $)")+
+  ylab("Gross (Million $)")
+ggplotly(G.a)
+```
+
+The point size represents the return of the movie. The larger size point is, the higher return it tends to be. From this interactive plot, we can find that the gross is generally positively correlated with the budget. And both gross and budget in recent years is much higher than the movies in early years. Additionally, the high return rate mostly happens in the movies with less investment. Therefore, in early years, movies tend to have higher return. The `drama` and `comedy` have been paid by the producer and audience with more money than other genres before 2000 with repsect to the gross and budget. But things changes in recent years. We can see that the mean budget and gross for `action`, `adventure` and `science-fiction` movies are the highest ones. This can be due to two reasons: one is that such kinds of movies tend to need more technology and money to build up. And today's technology is definitely better than the past and people have more money to invest in filming so that there is an increasing pattern of budget and gross. Second is that those kinds of movies more likely to be in 3D format and display better in the cinema, so that most people would like to watch them in the cinema and buy with a higher price for the 3D technology. For genres such as biography, horror, we can see that their budget and gross is smaller compared to other genres.
+
+# VII. Conclusion
+In our previous analysis, we have shown the popularity of different kinds of genre throughout time from four perspectives: the total number of each genres relative to the top 5500 popular movies, the number of votes for each movie with respect to its genre, the rating of each movie with repsect to its genre, the gross and budget with respect to genres. There are some limitations with our project: both online database cannot fully representative the movie market and there are missing data from recent years because of the short time limit. There are lots of improvement in todays' movie that our data and analysis fail to present. What we would like to conclude from our analysis is not only that what type of genre is the most popular and best throughout time, but also that how can we improve our movie industry. We certainly find some improvements can be made to grab more people's attetion, for example, we can make `biography` to be shorter and more interesting just like `drama`. The 3D technology can grab people's more attention in certain unpopular genre before. We wish to see that there could be more good films from different genres showing on the screen and presentation can be more varied. Further analysis can be made from recent years' movie genre, popularity and budget and gross to show how movie industry has been grown.
+
